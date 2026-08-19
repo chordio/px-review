@@ -1,0 +1,56 @@
+# Copy to .pxreview.yml in an installed repository.
+include:
+  - "**/*.css"
+  - "**/*.html"
+  - "**/*.jsx"
+  - "**/*.mdx"
+  - "**/*.svelte"
+  - "**/*.tsx"
+  - "**/*.vue"
+  - "**/components/**"
+  - "**/pages/**"
+  - "**/routes/**"
+  - "**/screens/**"
+
+exclude:
+  - "**/*.snap"
+  - "**/dist/**"
+  - "**/generated/**"
+  - "**/node_modules/**"
+  - "**/vendor/**"
+
+# Product briefs and repository-specific acceptance criteria get first claim on
+# the context budget. PR title/body are always included.
+brief:
+  - "docs/product/**/*.md"
+
+# Design-system and house-convention evidence.
+context:
+  - "AGENTS.md"
+  - "README.md"
+  - "package.json"
+  - "**/components/ui/**/*"
+  - "**/design-system/**/*"
+  - "**/tokens.css"
+  - "**/tokens.json"
+  - "**/tokens.ts"
+  - "**/tokens.tsx"
+
+categories:
+  - intent_fidelity
+  - product_fit
+  - visual_craft
+  - convention_adherence
+  - pathway_completeness
+  - content_language
+  - resilience
+  - accessibility
+
+model: gpt-5.6-terra
+reasoning_effort: medium
+min_confidence: 0.78
+max_inline_comments: 12
+block_on:
+  - blocking
+review_drafts: false
+review_forks: false

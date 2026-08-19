@@ -1,7 +1,7 @@
 [project]
 name = "px-review"
 version = "0.1.0"
-description = "PX taxonomy-based pull-request review service."
+description = "Frontend product-experience review for pull requests. CLI first."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"

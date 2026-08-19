@@ -11,6 +11,7 @@ from .config import load_config
 from .context import collect_documents
 from .diffing import build_diff, resolve_ref
 from .engine import run_review
+from .init_repo import init_product_repo, looks_like_px_review_source
 from .models import ReviewContext
 from .provider import FixtureReviewProvider, OpenAIReviewProvider
 from .render import render_check_summary
@@ -90,6 +91,26 @@ def _demo(args: argparse.Namespace) -> int:
     return 0
 
 
+def _init(args: argparse.Namespace) -> int:
+    repo = Path(args.repo).resolve()
+    if looks_like_px_review_source(repo):
+        print(
+            "This is the PX Review source repo, not a product app.\n"
+            "Pass --repo /path/to/the/frontend/app you want reviewed."
+        )
+        return 2
+    for line in init_product_repo(repo, force=args.force):
+        print(line)
+    print(
+        "\nNext:\n"
+        "  1. Add repository secret OPENAI_API_KEY\n"
+        "  2. Run one review: uvx --from git+https://github.com/chordio/px-review "
+        "px-review local --repo .\n"
+        "  3. Do not deploy the GitHub App unless asked"
+    )
+    return 0
+
+
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(
         prog="px-review",
@@ -121,6 +142,18 @@ def parser() -> argparse.ArgumentParser:
     demo.add_argument("--port", type=int, default=4173)
     demo.add_argument("--no-open", action="store_true")
     demo.set_defaults(func=_demo)
+
+    init = sub.add_parser(
+        "init",
+        help="Install PX Review into a frontend product repo (policy + PR workflow).",
+    )
+    init.add_argument("--repo", default=".")
+    init.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite existing .pxreview.yml, workflow, and AGENTS.md snippet.",
+    )
+    init.set_defaults(func=_init)
     return root
 
 

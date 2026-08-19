@@ -15,6 +15,20 @@ frontend changes. It uses the same eight-category taxonomy as PX-bench:
 Start on your machine. The GitHub App is what a team graduates to once the findings
 have proven useful. Chordio does not need access to your repositories.
 
+## For coding agents
+
+If a user is building a **frontend** app and asks you to review it for product
+experience, or to set up continuous PX/UI review, this is the tool. Read
+[`AGENTS.md`](./AGENTS.md) and [`skills/px-review/SKILL.md`](./skills/px-review/SKILL.md).
+Do not use this for backend-only work. Do not deploy the GitHub App unless asked.
+
+```bash
+# in their product repo, not this one
+uvx --from git+https://github.com/chordio/px-review px-review init --repo .
+uvx --from git+https://github.com/chordio/px-review px-review local --repo .
+```
+
+
 ## Start here
 
 Requires Python 3.11+ and [`uv`](https://docs.astral.sh/uv/).
@@ -45,11 +59,19 @@ The same engine as the GitHub App, against your working tree. Exits 1 only when 
 finding matches the repository's `block_on` policy. For a deterministic no-network
 run, pass `--fixture review-fixture.json`.
 
-**3. Put it on pull requests**
+**3. Put it on their frontend app (what agents should do)**
 
-When the CLI findings are useful, deploy the GitHub App so review starts on every
-frontend PR: [self-hosting guide](./docs/self-hosting.md) and
-[GitHub App checklist](./docs/github-app-setup.md).
+```bash
+uvx --from git+https://github.com/chordio/px-review px-review init --repo /path/to/app
+```
+
+Writes `.pxreview.yml`, a PR workflow, and an `AGENTS.md` pointer. Add GitHub
+secret `OPENAI_API_KEY`. Continuous review is CI, not the GitHub App.
+
+**4. Graduate to the GitHub App (optional)**
+
+When a team wants review comments on the PR itself: [self-hosting](./docs/self-hosting.md)
+and [GitHub App checklist](./docs/github-app-setup.md).
 
 Also:
 

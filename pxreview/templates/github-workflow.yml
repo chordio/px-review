@@ -1,0 +1,37 @@
+name: PX Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Review frontend diff
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "Set repository secret OPENAI_API_KEY so PX Review can run."
+            exit 1
+          fi
+          uvx --from git+https://github.com/chordio/px-review@main px-review local \
+            --repo . \
+            --base "${{ github.event.pull_request.base.sha }}" \
+            --head "${{ github.event.pull_request.head.sha }}" \
+            --repository "${{ github.repository }}" \
+            --title "$PR_TITLE" \
+            --body "$PR_BODY"
