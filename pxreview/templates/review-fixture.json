@@ -1,0 +1,19 @@
+{
+  "summary": "Fixture run: the pipeline ran end to end without a model. The one finding below names a file that is not in your diff, so it is reported summary-only; that is expected.",
+  "findings": [
+    {
+      "category": "pathway_completeness",
+      "severity": "medium",
+      "title": "Fixture finding: destructive action has no recovery path",
+      "body": "This finding comes from the packaged fixture, not from your code. It exists so the whole pipeline (policy, diff, context, validation, rendering) can be exercised with no API key.",
+      "recommendation": "Run with OPENAI_API_KEY set to get findings about your change.",
+      "path": "px-review-fixture/Example.tsx",
+      "line": 1,
+      "confidence": 0.9,
+      "evidence": ["pxreview/templates/review-fixture.json"]
+    }
+  ],
+  "categories": [
+    {"category": "pathway_completeness", "status": "not_evaluated", "summary": "Fixture run; no model was consulted."}
+  ]
+}

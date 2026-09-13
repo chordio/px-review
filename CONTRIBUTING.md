@@ -17,7 +17,11 @@ review pipeline without credentials or model spend:
 
 ```bash
 uv run px-review demo --no-open
+uv run px-review local --repo /path/to/any/git/repo --fixture builtin
 ```
+
+`--fixture builtin` is `pxreview/templates/review-fixture.json`; it must stay a
+valid `ReviewDraft`, and `tests/test_cli.py` checks that it does.
 
 ## Design constraints
 

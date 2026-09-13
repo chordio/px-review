@@ -10,6 +10,7 @@ import jwt
 from .engine import finding_fingerprint
 from .models import PullRequest, ReviewOutcome
 from .render import (
+    APP_RERUN_HINT,
     SUMMARY_MARKER,
     render_check_summary,
     render_inline_comment,
@@ -253,8 +254,10 @@ class GitHubClient:
         token: str,
         pull: PullRequest,
         outcome: ReviewOutcome,
+        *,
+        rerun_hint: str = APP_RERUN_HINT,
     ) -> int:
-        body = render_pr_summary(outcome, pull)[:65_000]
+        body = render_pr_summary(outcome, pull, rerun_hint=rerun_hint)[:65_000]
         comments = await self._list_pages(
             f"/repos/{pull.repository}/issues/{pull.number}/comments", token
         )

@@ -43,23 +43,42 @@ You are done only after a local review actually runs.
    Writes `.pxreview.yml`, `.github/workflows/px-review.yml`, and an
    `AGENTS.md` pointer. Use `--force` only if they asked to overwrite.
 3. Point `brief:` in `.pxreview.yml` at their product docs if those exist
-   (`docs/product/**/*.md` is the default).
-4. Ask them to add GitHub Actions secret `OPENAI_API_KEY`. Do not invent a key.
+   (`docs/product/**/*.md` is the default). If you edit `include` or
+   `exclude`, remember `*` crosses directories and `**/` means zero or more
+   directories (`src/**/*.tsx` includes `src/Card.tsx`), then check the
+   result with no key:
+
+   ```bash
+   uvx --from git+https://github.com/chordio/px-review px-review files --repo . --base origin/main --head HEAD
+   ```
+
+   Every changed file is listed as `keep`, `excluded` or `not-included`. If a
+   file you expect is `not-included`, fix the policy before going further.
+4. Ask them to add GitHub Actions secret `OPENAI_API_KEY` (repository
+   Settings → Secrets and variables → Actions). Do not invent a key.
 5. Run one review so they see output:
 
    ```bash
    uvx --from git+https://github.com/chordio/px-review px-review local --repo .
    ```
 
-   If there is no git diff, say so and still leave the workflow in place.
-6. Tell them PRs will run the workflow once the secret exists.
+   With no key in your environment, run it with `--fixture builtin` instead:
+   same pipeline, packaged findings, no network. Say that a model run still
+   needs the key. If there is no git diff, say so and still leave the workflow
+   in place.
+6. Tell them PRs will run the workflow once the secret exists, that the check
+   stays red with an annotation until then, and that a secret added after a
+   run needs a re-run. Findings appear on the pull request as review comments
+   on the changed lines plus one summary comment that updates in place. The
+   workflow also has a **Run workflow** button. If the first PR shows no check
+   at all, push again or run it by hand.
 
 **Do not** follow `docs/self-hosting.md` or register a GitHub App unless they
 explicitly want that. CLI + CI is the default for vibe-coders and PMs.
 
 ## Already installed (`.pxreview.yml` exists)
 
-Just run the review:
+Check the selection, then run the review:
 
 ```bash
 uvx --from git+https://github.com/chordio/px-review px-review local \
@@ -78,5 +97,7 @@ uvx --from git+https://github.com/chordio/px-review px-review demo
 
 - Product repo has `.pxreview.yml` and `.github/workflows/px-review.yml`
 - `AGENTS.md` mentions PX Review
-- One `px-review local` (or a clear "no frontend diff") has been attempted
-- They know `OPENAI_API_KEY` is required as a GitHub secret
+- `px-review files` shows the frontend files you expect as `keep`
+- One `px-review local` (with the key, or `--fixture builtin` without it, or a
+  clear "no frontend diff") has run
+- They know `OPENAI_API_KEY` is required as a GitHub secret, and where it goes

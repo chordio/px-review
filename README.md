@@ -25,7 +25,8 @@ Do not use this for backend-only work. Do not deploy the GitHub App unless asked
 ```bash
 # in their product repo, not this one
 uvx --from git+https://github.com/chordio/px-review px-review init --repo .
-uvx --from git+https://github.com/chordio/px-review px-review local --repo .
+uvx --from git+https://github.com/chordio/px-review px-review files --repo .    # what the policy selects; no key
+uvx --from git+https://github.com/chordio/px-review px-review local --repo .    # add --fixture builtin without a key
 ```
 
 
@@ -57,7 +58,19 @@ uv run px-review local \
 
 The same engine as the GitHub App, against your working tree. Exits 1 only when a
 finding matches the repository's `block_on` policy. For a deterministic no-network
-run, pass `--fixture review-fixture.json`.
+run with no key, pass `--fixture builtin`: the packaged fixture drives the whole
+pipeline (policy, diff, context, validation, rendering) and prints a report whose
+one finding is labelled as coming from the fixture.
+
+Before either, see which changed files the policy will review:
+
+```bash
+uv run px-review files --repo /path/to/product --base origin/main --head HEAD
+```
+
+One line per changed file: `keep`, `excluded`, or `not-included`. Run it after
+every edit to `.pxreview.yml`; a glob that matches nothing is otherwise invisible
+until a model run comes back saying the diff had no UI in it.
 
 **3. Put it on their frontend app (what agents should do)**
 
@@ -66,11 +79,46 @@ uvx --from git+https://github.com/chordio/px-review px-review init --repo /path/
 ```
 
 Writes `.pxreview.yml`, a PR workflow, and an `AGENTS.md` pointer. Add GitHub
-secret `OPENAI_API_KEY`. Continuous review is CI, not the GitHub App.
+secret `OPENAI_API_KEY` under Settings → Secrets and variables → Actions.
+Continuous review is CI, not the GitHub App.
+
+What to expect on the first pull request:
+
+- The check is red, with an annotation saying so, until the secret exists. A
+  secret added afterwards does not repair an old run: re-run the check, or push.
+- The findings land on the pull request: one review with a comment on each
+  changed line that has a finding, and one **PX Review** summary comment that
+  is updated in place on every run. Re-runs do not repeat a comment already
+  on the thread. This uses the repository's own token (`pull-requests: write`
+  in the workflow); pull requests from forks get a read-only token, so there
+  the report stays in the log and the summary page with a warning.
+- The report is also on the run's summary page and in the job log. The check
+  fails only on findings whose severity is in `block_on`.
+- The workflow also has a **Run workflow** button (`workflow_dispatch`) for a
+  review of a branch against `origin/main` without opening a pull request.
+- If the very first pull request shows no PX Review check at all, push once more
+  or run it by hand. We have seen the push that introduces the workflow file
+  create no run while the next push did; we do not know why.
+
+### Policy globs
+
+`include` and `exclude` in `.pxreview.yml` are matched with these rules:
+
+- `*` and `?` match any characters, directory separators included, so
+  `src/*.tsx` matches `src/a/b.tsx`.
+- `**/` anywhere means zero or more directories, so `src/**/*.tsx` matches
+  `src/Card.tsx` and `src/a/Card.tsx`, and `**/components/**` matches a
+  `components` directory at any depth.
+
+`brief` and `context` are pathlib globs against the working tree, where `**`
+also means any depth. `px-review files` is the quick way to see the result.
 
 **4. Graduate to the GitHub App (optional)**
 
-When a team wants review comments on the PR itself: [self-hosting](./docs/self-hosting.md)
+The workflow already leaves comments on the pull request. The App adds what a
+workflow cannot: review from a webhook with no Actions minutes, one installation
+for a whole organization, comments on pull requests from forks, and the
+`/px review` rerun command. When a team wants that: [self-hosting](./docs/self-hosting.md)
 and [GitHub App checklist](./docs/github-app-setup.md).
 
 Also:
@@ -91,7 +139,9 @@ your GitHub organization
 ```
 
 The local CLI skips GitHub entirely: your working tree goes to your configured LLM
-provider and the report prints here. Chordio is not a proxy. Teams with a different
+provider and the report prints here. With `--pull` (what the workflow passes on a
+pull request), it also posts the report to that pull request with the token in
+`GITHUB_TOKEN`. Chordio is not a proxy. Teams with a different
 provider or data boundary can replace `pxreview/provider.py`.
 
 The service verifies GitHub webhook HMACs, uses short-lived installation tokens,

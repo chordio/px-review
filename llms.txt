@@ -23,13 +23,16 @@ Do not contribute to this repo. In the product working tree:
 
 ```bash
 uvx --from git+https://github.com/chordio/px-review px-review init --repo .
-# then:
+# then, no key needed:
+uvx --from git+https://github.com/chordio/px-review px-review files --repo .
+# then (add --fixture builtin if there is no OPENAI_API_KEY in the environment):
 uvx --from git+https://github.com/chordio/px-review px-review local --repo .
 ```
 
 That writes `.pxreview.yml`, `.github/workflows/px-review.yml`, and an
-AGENTS.md pointer. Add GitHub secret OPENAI_API_KEY. Do not deploy the
-GitHub App unless the user asks.
+AGENTS.md pointer. Add GitHub secret OPENAI_API_KEY. The workflow posts the
+findings on each pull request as review comments plus a summary comment.
+Do not deploy the GitHub App unless the user asks.
 
 ## Quick demo (no credentials)
 
