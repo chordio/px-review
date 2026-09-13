@@ -12,6 +12,19 @@ def test_init_writes_policy_workflow_and_agents(tmp_path: Path):
     assert "github.com/chordio/px-review" in agents
     workflow = (tmp_path / ".github" / "workflows" / "px-review.yml").read_text()
     assert "uvx --from git+https://github.com/chordio/px-review@main" in workflow
+    # Manual runs, a report on the run's summary page, and a clear error when
+    # the secret is missing: what every install needed on its first day.
+    assert "workflow_dispatch:" in workflow
+    assert "GITHUB_STEP_SUMMARY" in workflow
+    assert "::error title=PX Review needs a key::" in workflow
+    assert "github.event.pull_request.base.sha || 'origin/main'" in workflow
+    assert "shell: bash" in workflow            # pipefail, so tee cannot hide a failure
+    # Findings land on the pull request with the repository's own token.
+    assert "pull-requests: write" in workflow
+    assert "GITHUB_TOKEN: ${{ github.token }}" in workflow
+    assert '${PR_NUMBER:+--pull "$PR_NUMBER"}' in workflow
+    policy = (tmp_path / ".pxreview.yml").read_text()
+    assert "`**/` means zero or more directories" in policy
     assert any(a.startswith("write") for a in actions)
 
 

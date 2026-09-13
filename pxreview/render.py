@@ -115,7 +115,19 @@ def render_review_body(outcome: ReviewOutcome, *, inline_count: int | None = Non
     return " ".join(pieces)
 
 
-def render_pr_summary(outcome: ReviewOutcome, pull: PullRequest) -> str:
+APP_RERUN_HINT = (
+    "New pushes are reviewed automatically. To rerun now, comment `/px review` "
+    "or `@px-review review`."
+)
+CI_RERUN_HINT = (
+    "New pushes are reviewed automatically. To rerun now, use **Run workflow** on "
+    "the PX Review action, or re-run the check."
+)
+
+
+def render_pr_summary(
+    outcome: ReviewOutcome, pull: PullRequest, *, rerun_hint: str = APP_RERUN_HINT
+) -> str:
     """Render the persistent PR-conversation report and its reproducibility receipt."""
     evaluated = sum(
         assessment.status != "not_evaluated" for assessment in outcome.categories
@@ -150,7 +162,6 @@ def render_pr_summary(outcome: ReviewOutcome, pull: PullRequest) -> str:
             f"**{status}**",
             render_check_summary(outcome),
             receipt,
-            "New pushes are reviewed automatically. To rerun now, comment `/px review` "
-            "or `@px-review review`.",
+            rerun_hint,
         ]
     )

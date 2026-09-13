@@ -3,35 +3,51 @@ name: PX Review
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+  # Run by hand from the Actions tab (or the API with a branch ref). Outside a
+  # pull_request event the review compares origin/main to the branch head.
+  workflow_dispatch:
 
+# pull-requests: write lets the job leave the findings on the pull request as
+# review comments on changed lines plus one summary comment, with the
+# repository's own token. Pull requests from forks get a read-only token;
+# the review still runs and prints, and posting is skipped with a warning.
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   review:
-    if: github.event.pull_request.draft == false
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - uses: astral-sh/setup-uv@v5
 
       - name: Review frontend diff
+        shell: bash
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
         run: |
           if [ -z "$OPENAI_API_KEY" ]; then
-            echo "Set repository secret OPENAI_API_KEY so PX Review can run."
+            echo "::error title=PX Review needs a key::Add the repository secret OPENAI_API_KEY (Settings → Secrets and variables → Actions), then re-run this check."
+            echo "PX Review did not run: the repository secret OPENAI_API_KEY is not set." >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
+          # The report goes to the log, to the run's summary page, and, on a
+          # pull request, onto the pull request itself (--pull).
           uvx --from git+https://github.com/chordio/px-review@main px-review local \
             --repo . \
-            --base "${{ github.event.pull_request.base.sha }}" \
-            --head "${{ github.event.pull_request.head.sha }}" \
+            --base "${{ github.event.pull_request.base.sha || 'origin/main' }}" \
+            --head "${{ github.event.pull_request.head.sha || 'HEAD' }}" \
             --repository "${{ github.repository }}" \
-            --title "$PR_TITLE" \
-            --body "$PR_BODY"
+            --title "${PR_TITLE:-Manual PX review}" \
+            --body "$PR_BODY" \
+            ${PR_NUMBER:+--pull "$PR_NUMBER"} \
+            | tee -a "$GITHUB_STEP_SUMMARY"

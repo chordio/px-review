@@ -1,4 +1,11 @@
 # Copy to .pxreview.yml in an installed repository.
+#
+# include / exclude: `*` matches anything, directory separators included, and
+# `**/` means zero or more directories. So `**/*.tsx` is every .tsx file at
+# any depth, and `src/**/*.tsx` includes `src/Card.tsx` as well as
+# `src/a/Card.tsx`. Check what a change to these selects with
+# `px-review files --repo .` (no key needed). brief / context are pathlib
+# globs against the working tree.
 include:
   - "**/*.css"
   - "**/*.html"

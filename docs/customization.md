@@ -11,7 +11,10 @@ Add `.pxreview.yml` to each reviewed repository. Start from
 
 - `brief`: product briefs and acceptance criteria;
 - `context`: design-system, component, token, content, and interaction guidance;
-- `include` and `exclude`: files that carry PX signal;
+- `include` and `exclude`: files that carry PX signal. `*` matches across
+  directory separators and `**/` means zero or more directories, so
+  `src/**/*.tsx` covers `src/Card.tsx` too. Check the effect with
+  `px-review files --repo .`;
 - `categories`: taxonomy categories relevant to the product;
 - `min_confidence` and `max_inline_comments`: noise controls;
 - `block_on`: severities that fail the check;
