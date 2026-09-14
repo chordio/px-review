@@ -68,15 +68,25 @@ You are done only after a local review actually runs.
    in place.
 6. Tell them PRs will run the workflow once the secret exists, that the check
    stays red with an annotation until then, and that a secret added after a
-   run needs a re-run. Findings appear on the pull request as review comments
-   on the changed lines plus one summary comment that updates in place. The
-   workflow also has a **Run workflow** button. If the first PR shows no check
-   at all, push again or run it by hand.
+   run needs a re-run. Findings appear on the pull request as one PX Review
+   comment (a colour per category, the findings grouped under each, and a
+   prompt for a coding agent that fixes them all) plus a review comment on
+   each changed line with a finding. The check fails only on `block_on`
+   severities (`blocking` by default); a red comment can still be a green
+   check. The workflow also has a **Run workflow** button. If the first PR
+   shows no check at all, push again or run it by hand.
 
 **Do not** follow `docs/self-hosting.md` or register a GitHub App unless they
 explicitly want that. CLI + CI is the default for vibe-coders and PMs.
 
 ## Already installed (`.pxreview.yml` exists)
+
+If pull requests get a check but no PX Review comment, the workflow predates
+the comments. Replace only the workflow (policy and AGENTS.md are left alone):
+
+```bash
+uvx --from git+https://github.com/chordio/px-review px-review init --repo . --update-workflow
+```
 
 Check the selection, then run the review:
 

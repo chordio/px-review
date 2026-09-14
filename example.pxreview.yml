@@ -57,6 +57,9 @@ model: gpt-5.6-terra
 reasoning_effort: medium
 min_confidence: 0.78
 max_inline_comments: 12
+# Severities that fail the check. Everything else is reported (red in the PR
+# comment for blocking/high, yellow for medium/low) with a passing check.
+# Add `high` here to fail on high findings too.
 block_on:
   - blocking
 review_drafts: false
