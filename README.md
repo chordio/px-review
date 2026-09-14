@@ -135,8 +135,9 @@ also means any depth. `px-review files` is the quick way to see the result.
 
 Early installs had a workflow that only printed the report to the job log. If
 your pull requests show a green check and no PX Review comment, that is the
-one you have: the current workflow comments on every run, findings or not. `px-review init` says so (`outdated`) and this replaces only the
-workflow file, leaving `.pxreview.yml` and `AGENTS.md` alone:
+one you have: the current workflow comments on every run, findings or not.
+`px-review init` says so (`outdated`) and this replaces only the workflow
+file, leaving `.pxreview.yml` and `AGENTS.md` alone:
 
 ```bash
 uvx --from git+https://github.com/chordio/px-review px-review init --repo . --update-workflow
