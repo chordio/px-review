@@ -192,6 +192,124 @@ def test_local_with_pull_posts_inline_review_and_summary_comment(
     assert "Posted to acme/app#9" in out and "1 new inline comment(s)" in out
 
 
+def _repo_with_no_ui_change(tmp_path: Path) -> str:
+    """Two commits whose diff touches nothing the default policy selects."""
+    _git(tmp_path, "init", "-q")
+    _git(tmp_path, "config", "user.email", "test@example.com")
+    _git(tmp_path, "config", "user.name", "Test")
+    (tmp_path / "worker.py").write_text("VALUE = 1\n")
+    _git(tmp_path, "add", ".")
+    _git(tmp_path, "commit", "-qm", "base")
+    base = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=tmp_path, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    (tmp_path / "worker.py").write_text("VALUE = 2\n")
+    _git(tmp_path, "add", ".")
+    _git(tmp_path, "commit", "-qm", "head")
+    return base
+
+
+def _clean_fixture(tmp_path: Path) -> Path:
+    fixture = tmp_path / "clean.json"
+    fixture.write_text(json.dumps({
+        "summary": "The change is consistent with the existing components.",
+        "findings": [],
+        "categories": [
+            {"category": "accessibility", "status": "no_findings", "summary": "Labelled."},
+        ],
+    }))
+    return fixture
+
+
+def test_local_with_pull_posts_summary_comment_when_green(tmp_path: Path, monkeypatch, capsys):
+    """No findings still leaves the PX Review comment, the way Vercel and CodeRabbit
+    comment on every pull request: a green run is visible on the PR, not silent.
+    Only the inline review is skipped, since there is no line to attach to."""
+    _CaptureGitHub.instances.clear()
+    monkeypatch.setattr("pxreview.cli.GitHubClient", _CaptureGitHub)
+    monkeypatch.setenv("GITHUB_TOKEN", "ghs_test")
+    base = _repo_with_one_change(tmp_path)
+    args = parser().parse_args([
+        "local", "--repo", str(tmp_path), "--base", base,
+        "--fixture", str(_clean_fixture(tmp_path)),
+        "--repository", "acme/app", "--pull", "9", "--title", "Add card",
+    ])
+    assert args.func(args) == 0
+    reqs = _CaptureGitHub.instances[0].requests
+    posted = {p: j for m, p, _, j in reqs if m == "POST"}
+    assert "/repos/acme/app/pulls/9/reviews" not in posted
+    summary = posted["/repos/acme/app/issues/9/comments"]
+    assert "<!-- px-review:summary -->" in summary["body"]
+    assert "## 🟢 PX Review · 0 findings · check passed" in summary["body"]
+    assert "No high-confidence PX findings in the reviewed change." in summary["body"]
+    assert "| 🟢 | 8. Accessibility | No finding · Labelled. |" in summary["body"]
+    out = capsys.readouterr().out
+    assert "Posted to acme/app#9" in out and "(no findings)" in out
+    assert "inline comment" not in out
+
+
+def test_local_with_pull_posts_summary_comment_when_skipped(tmp_path: Path, monkeypatch, capsys):
+    """A diff with no PX-relevant files is still a run, so it still comments."""
+    _CaptureGitHub.instances.clear()
+    monkeypatch.setattr("pxreview.cli.GitHubClient", _CaptureGitHub)
+    monkeypatch.setenv("GITHUB_TOKEN", "ghs_test")
+    base = _repo_with_no_ui_change(tmp_path)
+    args = parser().parse_args([
+        "local", "--repo", str(tmp_path), "--base", base, "--fixture", "builtin",
+        "--repository", "acme/app", "--pull", "9",
+    ])
+    assert args.func(args) == 0
+    reqs = _CaptureGitHub.instances[0].requests
+    posted = {p: j for m, p, _, j in reqs if m == "POST"}
+    assert list(posted) == ["/repos/acme/app/issues/9/comments"]
+    body = posted["/repos/acme/app/issues/9/comments"]["body"]
+    assert "## ⚪ PX Review · skipped" in body
+    assert "No changed files matched" in body
+    out = capsys.readouterr().out
+    assert "Posted to acme/app#9" in out and "(skipped)" in out
+
+
+def test_local_with_pull_keeps_summary_when_inline_review_fails(
+    tmp_path: Path, monkeypatch, capsys
+):
+    """The summary comment is posted first and on its own: a failing review call
+    (a read-only token, a line GitHub will not accept) warns, and the comment stays."""
+    from pxreview.github import GitHubError
+
+    class _ReviewFails(_CaptureGitHub):
+        async def publish_review(self, token, pull, outcome):
+            raise GitHubError("GitHub POST /reviews failed (403): Resource not accessible")
+
+    _CaptureGitHub.instances.clear()
+    monkeypatch.setattr("pxreview.cli.GitHubClient", _ReviewFails)
+    monkeypatch.setenv("GITHUB_TOKEN", "ghs_test")
+    base = _repo_with_one_change(tmp_path)
+    fixture = tmp_path / "review.json"
+    fixture.write_text(json.dumps({
+        "summary": "One keyboard problem.",
+        "findings": [{
+            "category": "accessibility", "severity": "medium",
+            "title": "Button has no accessible name",
+            "body": "The new button renders an icon with no text alternative.",
+            "recommendation": "Add an aria-label.",
+            "path": "Card.tsx", "line": 1, "confidence": 0.9,
+        }],
+        "categories": [],
+    }))
+    args = parser().parse_args([
+        "local", "--repo", str(tmp_path), "--base", base, "--fixture", str(fixture),
+        "--repository", "acme/app", "--pull", "9",
+    ])
+    assert args.func(args) == 0
+    reqs = _CaptureGitHub.instances[0].requests
+    posted = {p: j for m, p, _, j in reqs if m == "POST"}
+    assert list(posted) == ["/repos/acme/app/issues/9/comments"]
+    assert "Button has no accessible name" in posted["/repos/acme/app/issues/9/comments"]["body"]
+    out = capsys.readouterr().out
+    assert "Posted to acme/app#9" in out and "(1 finding)" in out
+    assert "::warning::PX review: summary comment posted, but the inline review" in out
+
+
 def test_local_with_pull_but_no_token_warns_and_still_reports(tmp_path: Path, monkeypatch, capsys):
     _CaptureGitHub.instances.clear()
     monkeypatch.setattr("pxreview.cli.GitHubClient", _CaptureGitHub)

@@ -87,14 +87,20 @@ def _local(args: argparse.Namespace) -> int:
 
 
 def _post_to_pull(args: argparse.Namespace, base_sha: str, head_sha: str, outcome) -> None:
-    """Leave the findings on the pull request, the way the GitHub App does.
+    """Leave the report on the pull request, the way the GitHub App does.
 
-    Same two surfaces, same code: one review with a comment on each changed
-    line that has a finding (deduplicated on fingerprints, so a re-run after
-    a push does not repeat itself), and one persistent summary comment that
-    is updated in place. The token comes from an environment variable, never
-    an argument, so it cannot land in a process list or a log. A failure to
-    post is a warning, not a failed review: the report already printed.
+    Same two surfaces, same code. The persistent **PX Review** summary comment
+    is posted on every run, findings or not, the way Vercel and CodeRabbit
+    leave theirs: a green run says so on the pull request instead of leaving
+    silence that reads as "did not run". It is created once and updated in
+    place. The second surface, one review with a comment on each changed line
+    that has a finding (deduplicated on fingerprints, so a re-run after a
+    push does not repeat itself), exists only when there is something to
+    attach. The summary goes first and on its own error boundary, so a
+    failing review call cannot take the summary with it. The token comes from
+    an environment variable, never an argument, so it cannot land in a
+    process list or a log. A failure to post is a warning, not a failed
+    review: the report already printed.
     """
     token = os.environ.get(args.github_token_env or "", "")
     if not args.repository:
@@ -118,20 +124,35 @@ def _post_to_pull(args: argparse.Namespace, base_sha: str, head_sha: str, outcom
     )
     client = GitHubClient(api_url=os.environ.get("GITHUB_API_URL", "https://api.github.com"))
 
-    async def post() -> tuple[int, int]:
-        inline = await client.publish_review(token, pull, outcome)
-        comment_id = await client.upsert_summary_comment(
-            token, pull, outcome, rerun_hint=CI_RERUN_HINT
-        )
-        return inline, comment_id
-
+    where = f"{args.repository}#{pull.number}"
     try:
-        inline, _ = asyncio.run(post())
+        comment_id = asyncio.run(
+            client.upsert_summary_comment(token, pull, outcome, rerun_hint=CI_RERUN_HINT)
+        )
     except GitHubError as error:
-        print(f"::warning::PX review: could not post to the pull request: {error}")
+        print(f"::warning::PX review: could not post the summary comment to {where}: {error}")
         return
-    print(f"\nPosted to {args.repository}#{pull.number}: summary comment updated, "
-          f"{inline} new inline comment(s).")
+    print(f"\nPosted to {where}: PX Review summary comment {comment_id} "
+          f"({_outcome_word(outcome)}).")
+    if not any(finding.path is not None for finding in outcome.findings):
+        return
+    try:
+        inline = asyncio.run(client.publish_review(token, pull, outcome))
+    except GitHubError as error:
+        print(f"::warning::PX review: summary comment posted, but the inline review on "
+              f"{where} failed: {error}")
+        return
+    print(f"{inline} new inline comment(s) on changed lines.")
+
+
+def _outcome_word(outcome) -> str:
+    """How the summary comment reads, for the job log: skipped, clean, or N findings."""
+    if outcome.skipped:
+        return "skipped"
+    count = len(outcome.findings)
+    if not count:
+        return "no findings"
+    return f"{count} finding{'s' if count != 1 else ''}"
 
 
 def _taxonomy() -> int:
