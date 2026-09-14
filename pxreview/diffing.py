@@ -46,9 +46,9 @@ def _glob_regex(pattern: str) -> re.Pattern[str]:
     for chunk in chunks:
         translated = fnmatch.translate(chunk)
         # fnmatch.translate wraps the body as "(?s:BODY)\Z"; keep BODY.
-        assert translated.startswith("(?s:") and translated.endswith(")\Z")
+        assert translated.startswith("(?s:") and translated.endswith(r")\Z")
         bodies.append(translated[4:-3])
-    return re.compile("(?s:" + "(?:.*/)?".join(bodies) + ")\Z")
+    return re.compile("(?s:" + "(?:.*/)?".join(bodies) + r")\Z")
 
 
 def matches_path(path: str, patterns: list[str]) -> bool:
