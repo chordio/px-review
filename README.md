@@ -86,10 +86,16 @@ What to expect on the first pull request:
 
 - The check is red, with an annotation saying so, until the secret exists. A
   secret added afterwards does not repair an old run: re-run the check, or push.
-- The findings land on the pull request, next to the other bots' comments:
-  one **PX Review** comment that is updated in place on every run, and one
-  review with a comment on each changed line that has a finding. Re-runs do
-  not repeat a line comment already on the thread. This uses the repository's
+- The report lands on the pull request, next to the other bots' comments:
+  one **PX Review** comment on every run, including a green one with no
+  findings and a run that selected no files (the same way Vercel and
+  CodeRabbit always comment), updated in place on each push; and, when there
+  are findings on changed lines, one review with a comment on each of those
+  lines. Re-runs do not repeat a line comment already on the thread. A pull
+  request with no PX Review comment after the check ran is a posting problem,
+  not a clean review: look for a `::warning::` line in the job log (and see
+  the upgrade note below if the workflow is from an early install). This
+  uses the repository's
   own token (`pull-requests: write` in the workflow); pull requests from forks
   get a read-only token, so there the report stays in the log and the summary
   page with a warning.
@@ -129,8 +135,9 @@ also means any depth. `px-review files` is the quick way to see the result.
 
 Early installs had a workflow that only printed the report to the job log. If
 your pull requests show a green check and no PX Review comment, that is the
-one you have. `px-review init` says so (`outdated`) and this replaces only the
-workflow file, leaving `.pxreview.yml` and `AGENTS.md` alone:
+one you have: the current workflow comments on every run, findings or not.
+`px-review init` says so (`outdated`) and this replaces only the workflow
+file, leaving `.pxreview.yml` and `AGENTS.md` alone:
 
 ```bash
 uvx --from git+https://github.com/chordio/px-review px-review init --repo . --update-workflow

@@ -44,8 +44,9 @@ jobs:
           fi
           # The report goes to the log, to the run's summary page, and, on a
           # pull request, onto the pull request itself (--pull): one PX Review
-          # comment with a colour per category and a prompt for a coding agent,
-          # plus a review comment on each changed line with a finding.
+          # comment on every run, green or not, with a colour per category and
+          # a prompt for a coding agent, plus a review comment on each changed
+          # line with a finding.
           uvx --from git+https://github.com/chordio/px-review@main px-review local \
             --repo . \
             --base "${{ github.event.pull_request.base.sha || 'origin/main' }}" \
