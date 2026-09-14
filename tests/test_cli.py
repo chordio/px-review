@@ -118,7 +118,7 @@ def test_builtin_fixture_runs_the_pipeline_without_a_key(tmp_path: Path, monkeyp
     except SystemExit as exit:
         assert exit.code == 0
     out = capsys.readouterr().out
-    assert "PX review" in out and "Fixture run" in out
+    assert "PX Review" in out and "Fixture run" in out
     assert "Model: `fixture`" in out
 
 
@@ -179,10 +179,13 @@ def test_local_with_pull_posts_inline_review_and_summary_comment(
     review = posted["/repos/acme/app/pulls/9/reviews"]
     assert review["event"] == "COMMENT" and review["comments"][0]["path"] == "Card.tsx"
     assert review["comments"][0]["line"] == 1
-    assert "PX · Accessibility · medium" in review["comments"][0]["body"]
+    assert "PX · 🟡 Accessibility · medium" in review["comments"][0]["body"]
+    assert "Prompt for a coding agent" in review["comments"][0]["body"]
     summary = posted["/repos/acme/app/issues/9/comments"]
     assert "<!-- px-review:summary -->" in summary["body"]
     assert "Button has no accessible name" in summary["body"]
+    assert "## 🟡 PX Review · 1 finding · check passed" in summary["body"]
+    assert "Fix the following PX Review findings in acme/app (pull request #9" in summary["body"]
     assert "Run workflow" in summary["body"] and "/px review" not in summary["body"]
     assert all(t == "ghs_test" for _, _, t, _ in reqs)
     out = capsys.readouterr().out

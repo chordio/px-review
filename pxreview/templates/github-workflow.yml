@@ -20,11 +20,13 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
+      # Both actions run on Node 24. Older majors (checkout@v4, setup-uv@v6 and
+      # below) declare Node 20 and make every run print a deprecation warning.
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v7
 
       - name: Review frontend diff
         shell: bash
@@ -41,7 +43,9 @@ jobs:
             exit 1
           fi
           # The report goes to the log, to the run's summary page, and, on a
-          # pull request, onto the pull request itself (--pull).
+          # pull request, onto the pull request itself (--pull): one PX Review
+          # comment with a colour per category and a prompt for a coding agent,
+          # plus a review comment on each changed line with a finding.
           uvx --from git+https://github.com/chordio/px-review@main px-review local \
             --repo . \
             --base "${{ github.event.pull_request.base.sha || 'origin/main' }}" \

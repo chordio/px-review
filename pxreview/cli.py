@@ -183,7 +183,9 @@ def _init(args: argparse.Namespace) -> int:
             "Pass --repo /path/to/the/frontend/app you want reviewed."
         )
         return 2
-    for line in init_product_repo(repo, force=args.force):
+    for line in init_product_repo(
+        repo, force=args.force, update_workflow=args.update_workflow
+    ):
         print(line)
     print(
         "\nNext:\n"
@@ -260,6 +262,12 @@ def parser() -> argparse.ArgumentParser:
         "--force",
         action="store_true",
         help="Overwrite existing .pxreview.yml, workflow, and AGENTS.md snippet.",
+    )
+    init.add_argument(
+        "--update-workflow",
+        action="store_true",
+        help="Rewrite only .github/workflows/px-review.yml from the current template "
+        "(PR comments, current actions); leaves .pxreview.yml and AGENTS.md alone.",
     )
     init.set_defaults(func=_init)
     return root

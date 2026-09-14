@@ -31,7 +31,10 @@ uvx --from git+https://github.com/chordio/px-review px-review local --repo .
 
 That writes `.pxreview.yml`, `.github/workflows/px-review.yml`, and an
 AGENTS.md pointer. Add GitHub secret OPENAI_API_KEY. The workflow posts the
-findings on each pull request as review comments plus a summary comment.
+findings on each pull request: one PX Review comment (colour per category,
+findings grouped under each, a prompt a coding agent can fix them from) plus
+a review comment on each changed line with a finding. An older install whose
+workflow only logs the report: `px-review init --repo . --update-workflow`.
 Do not deploy the GitHub App unless the user asks.
 
 ## Quick demo (no credentials)

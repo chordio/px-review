@@ -125,6 +125,9 @@ class ReviewOutcome:
     skip_reason: str | None = None
     model: str | None = None
     inline_fingerprints: tuple[str, ...] = field(default_factory=tuple)
+    # The severities that fail the check (`block_on`), carried so the report
+    # can say why a finding did or did not fail it.
+    block_on: tuple[Severity, ...] = (Severity.BLOCKING,)
 
 
 @dataclass(frozen=True)

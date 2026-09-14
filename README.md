@@ -86,14 +86,26 @@ What to expect on the first pull request:
 
 - The check is red, with an annotation saying so, until the secret exists. A
   secret added afterwards does not repair an old run: re-run the check, or push.
-- The findings land on the pull request: one review with a comment on each
-  changed line that has a finding, and one **PX Review** summary comment that
-  is updated in place on every run. Re-runs do not repeat a comment already
-  on the thread. This uses the repository's own token (`pull-requests: write`
-  in the workflow); pull requests from forks get a read-only token, so there
-  the report stays in the log and the summary page with a warning.
-- The report is also on the run's summary page and in the job log. The check
-  fails only on findings whose severity is in `block_on`.
+- The findings land on the pull request, next to the other bots' comments:
+  one **PX Review** comment that is updated in place on every run, and one
+  review with a comment on each changed line that has a finding. Re-runs do
+  not repeat a line comment already on the thread. This uses the repository's
+  own token (`pull-requests: write` in the workflow); pull requests from forks
+  get a read-only token, so there the report stays in the log and the summary
+  page with a warning.
+- The PX Review comment reads like a status page: a colour per category
+  (🔴 a blocking or high finding, 🟡 a medium or low finding, 🟢 evaluated and
+  clean, ⚪ not evaluated), the findings grouped under their category with the
+  file, line, problem, and fix, and a **Prompt for a coding agent** block that
+  hands all of them to Claude Code, Codex, Cursor, or whatever you use. Each
+  line comment carries the same prompt for just that finding.
+- The colour and the check are two different things. The colour follows the
+  worst severity found. The check fails only on findings whose severity is in
+  `block_on`, which is `[blocking]` by default, so a `high` finding is red in
+  the comment and still a passing check. To fail the check on high findings
+  too, set `block_on: [blocking, high]` in `.pxreview.yml`. The comment says
+  which rule was applied.
+- The report is also on the run's summary page and in the job log.
 - The workflow also has a **Run workflow** button (`workflow_dispatch`) for a
   review of a branch against `origin/main` without opening a pull request.
 - If the very first pull request shows no PX Review check at all, push once more
@@ -112,6 +124,21 @@ What to expect on the first pull request:
 
 `brief` and `context` are pathlib globs against the working tree, where `**`
 also means any depth. `px-review files` is the quick way to see the result.
+
+**Upgrading an install from before the pull-request comments**
+
+Early installs had a workflow that only printed the report to the job log. If
+your pull requests show a green check and no PX Review comment, that is the
+one you have. `px-review init` says so (`outdated`) and this replaces only the
+workflow file, leaving `.pxreview.yml` and `AGENTS.md` alone:
+
+```bash
+uvx --from git+https://github.com/chordio/px-review px-review init --repo . --update-workflow
+```
+
+The new workflow also uses `actions/checkout@v5` and `astral-sh/setup-uv@v7`,
+which run on Node 24; the earlier majors run on Node 20 and make every run
+print GitHub's deprecation warning.
 
 **4. Graduate to the GitHub App (optional)**
 

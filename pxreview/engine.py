@@ -122,6 +122,7 @@ def finalize_review(
         conclusion=conclusion,
         model=model,
         inline_fingerprints=tuple(inline_fingerprints),
+        block_on=tuple(config.block_on),
     )
 
 
@@ -139,6 +140,7 @@ def run_review(
             skipped=True,
             skip_reason="No changed files matched `.pxreview.yml` include/exclude rules.",
             model=getattr(provider, "model", None),
+            block_on=tuple(config.block_on),
         )
     draft = provider.review(SYSTEM_PROMPT, build_user_prompt(context, config))
     return finalize_review(
