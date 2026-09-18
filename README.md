@@ -93,9 +93,9 @@ What to expect on the first pull request:
   are findings on changed lines, one review with a comment on each of those
   lines. Re-runs do not repeat a line comment already on the thread. A pull
   request with no PX Review comment after the check ran is a posting problem,
-  not a clean review: look for a `::warning::` line in the job log (and see
-  the upgrade note below if the workflow is from an early install). This
-  uses the repository's
+  not a clean review: the run's Annotations say why, as does a `::warning::`
+  line in the job log, and a workflow from an early install is named there as
+  such (see the upgrade note below). This uses the repository's
   own token (`pull-requests: write` in the workflow); pull requests from forks
   get a read-only token, so there the report stays in the log and the summary
   page with a warning.
@@ -136,8 +136,11 @@ also means any depth. `px-review files` is the quick way to see the result.
 Early installs had a workflow that only printed the report to the job log. If
 your pull requests show a green check and no PX Review comment, that is the
 one you have: the current workflow comments on every run, findings or not.
-`px-review init` says so (`outdated`) and this replaces only the workflow
-file, leaving `.pxreview.yml` and `AGENTS.md` alone:
+A run from that workflow now says so itself: its Annotations carry a warning,
+**PX Review workflow is outdated**, naming the command below, and the report
+appears on the run's summary page as well as in the log. `px-review init`
+says so too (`outdated`). This replaces only the workflow file, leaving
+`.pxreview.yml` and `AGENTS.md` alone:
 
 ```bash
 uvx --from git+https://github.com/chordio/px-review px-review init --repo . --update-workflow

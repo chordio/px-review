@@ -2,7 +2,21 @@ import json
 import subprocess
 from pathlib import Path
 
-from pxreview.cli import BUILTIN_FIXTURE, _demo, _files, main, parser
+import pytest
+
+from pxreview.cli import BUILTIN_FIXTURE, _actions_pull_number, _demo, _files, main, parser
+
+
+@pytest.fixture(autouse=True)
+def _outside_github_actions(monkeypatch):
+    """The CLI reads these to recognise an outdated workflow run. Tests that
+    want that set them on purpose; nothing leaks in from a CI job running
+    this suite."""
+    for name in (
+        "GITHUB_ACTIONS", "GITHUB_EVENT_NAME", "GITHUB_EVENT_PATH", "GITHUB_REF",
+        "GITHUB_STEP_SUMMARY",
+    ):
+        monkeypatch.delenv(name, raising=False)
 
 
 def _git(repo: Path, *args: str) -> None:
@@ -354,3 +368,103 @@ def test_demo_command_is_registered_and_assets_exist():
     assert "Automatic review queued" in html
     assert "window.setTimeout(runReview" in html
     assert "Review receipt" in html
+
+
+def _pull_request_job(monkeypatch, tmp_path: Path, *, number: int | None = 46) -> Path:
+    """What a pull_request job looks like from inside: Actions, the event, and
+    the step-summary file GitHub gives every job. Returns that file."""
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "pull_request")
+    summary = tmp_path / "step-summary.md"
+    summary.write_text("")
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+    if number is not None:
+        event = tmp_path / "event.json"
+        event.write_text(json.dumps({"pull_request": {"number": number}}))
+        monkeypatch.setenv("GITHUB_EVENT_PATH", str(event))
+    return summary
+
+
+def test_outdated_workflow_run_warns_and_puts_the_report_on_the_summary_page(
+    tmp_path: Path, monkeypatch, capsys
+):
+    """The August workflow runs the CLI on a pull request without --pull, so the
+    check is green and the pull request silent. The run must say so: one warning
+    annotation naming the upgrade command, and the report on the run's summary
+    page, not only in the log. The exit code is unchanged."""
+    summary = _pull_request_job(monkeypatch, tmp_path)
+    base = _repo_with_one_change(tmp_path)
+    args = parser().parse_args([
+        "local", "--repo", str(tmp_path), "--base", base, "--fixture", "builtin",
+        "--repository", "acme/app", "--title", "Add card",
+    ])
+    assert args.func(args) == 0
+    out = capsys.readouterr().out
+    assert "PX Review" in out and "Model: `fixture`" in out       # the log still has the report
+    warnings = [line for line in out.splitlines() if line.startswith("::warning")]
+    assert len(warnings) == 1
+    assert warnings[0].startswith("::warning title=PX Review workflow is outdated::")
+    assert "pull request #46" in warnings[0]
+    assert "px-review init --repo . --update-workflow" in warnings[0]
+    page = summary.read_text()
+    assert page.startswith("> **This workflow predates PX Review's pull-request comments.**")
+    assert "--update-workflow" in page
+    assert "PX Review · 1 finding · check passed" in page and "Model: `fixture`" in page
+
+
+def test_outdated_workflow_falls_back_to_the_ref_for_the_pull_number(monkeypatch, tmp_path):
+    assert _actions_pull_number() is None
+    monkeypatch.setenv("GITHUB_REF", "refs/pull/7/merge")
+    assert _actions_pull_number() == 7
+    broken = tmp_path / "event.json"
+    broken.write_text("{not json")
+    monkeypatch.setenv("GITHUB_EVENT_PATH", str(broken))
+    assert _actions_pull_number() == 7                             # unreadable payload, ref wins
+    _pull_request_job(monkeypatch, tmp_path, number=46)
+    assert _actions_pull_number() == 46                            # payload wins over the ref
+
+
+@pytest.mark.parametrize(
+    "env",
+    [
+        {},                                                        # a developer's terminal
+        {"GITHUB_ACTIONS": "true", "GITHUB_EVENT_NAME": "workflow_dispatch"},  # Run workflow
+    ],
+)
+def test_local_without_pull_is_quiet_outside_a_pull_request_job(
+    tmp_path: Path, monkeypatch, capsys, env
+):
+    """No annotation and nothing appended to the summary file: the current
+    template's manual run tees stdout into it already, and a terminal run has
+    nothing to upgrade."""
+    summary = tmp_path / "step-summary.md"
+    summary.write_text("")
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+    for name, value in env.items():
+        monkeypatch.setenv(name, value)
+    base = _repo_with_one_change(tmp_path)
+    args = parser().parse_args(
+        ["local", "--repo", str(tmp_path), "--base", base, "--fixture", "builtin"]
+    )
+    assert args.func(args) == 0
+    assert "::warning" not in capsys.readouterr().out
+    assert summary.read_text() == ""
+
+
+def test_current_workflow_with_pull_gets_no_outdated_warning(tmp_path: Path, monkeypatch, capsys):
+    """--pull inside a pull_request job is the current workflow: it posts, and
+    the outdated-workflow path stays out of the way."""
+    _CaptureGitHub.instances.clear()
+    monkeypatch.setattr("pxreview.cli.GitHubClient", _CaptureGitHub)
+    monkeypatch.setenv("GITHUB_TOKEN", "ghs_test")
+    summary = _pull_request_job(monkeypatch, tmp_path)
+    base = _repo_with_one_change(tmp_path)
+    args = parser().parse_args([
+        "local", "--repo", str(tmp_path), "--base", base, "--fixture", "builtin",
+        "--repository", "acme/app", "--pull", "46",
+    ])
+    assert args.func(args) == 0
+    out = capsys.readouterr().out
+    assert "Posted to acme/app#46" in out
+    assert "outdated" not in out and "::warning" not in out
+    assert summary.read_text() == ""
