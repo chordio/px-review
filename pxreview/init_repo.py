@@ -8,6 +8,12 @@ POLICY_NAME = ".pxreview.yml"
 WORKFLOW_PATH = Path(".github") / "workflows" / "px-review.yml"
 AGENTS_NAME = "AGENTS.md"
 
+# The one command that moves an install onto the current workflow. Printed by
+# the CLI from inside an outdated workflow run, and in the README.
+UPDATE_WORKFLOW_COMMAND = (
+    "uvx --from git+https://github.com/chordio/px-review px-review init --repo . --update-workflow"
+)
+
 
 def looks_like_px_review_source(repo: Path) -> bool:
     pyproject = repo / "pyproject.toml"

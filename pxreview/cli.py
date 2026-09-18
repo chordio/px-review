@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import os
+import re
 import webbrowser
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -13,7 +15,11 @@ from .context import collect_documents
 from .diffing import build_diff, resolve_ref, selection
 from .engine import run_review
 from .github import GitHubClient, GitHubError
-from .init_repo import init_product_repo, looks_like_px_review_source
+from .init_repo import (
+    UPDATE_WORKFLOW_COMMAND,
+    init_product_repo,
+    looks_like_px_review_source,
+)
 from .models import PullRequest, ReviewContext
 from .provider import FixtureReviewProvider, OpenAIReviewProvider
 from .render import CI_RERUN_HINT, render_check_summary
@@ -83,6 +89,8 @@ def _local(args: argparse.Namespace) -> int:
         print(rendered)
     if args.pull is not None:
         _post_to_pull(args, base_sha, head_sha, outcome)
+    elif _actions_pull_request_event():
+        _warn_outdated_workflow(rendered)
     return 1 if outcome.conclusion == "failure" else 0
 
 
@@ -143,6 +151,59 @@ def _post_to_pull(args: argparse.Namespace, base_sha: str, head_sha: str, outcom
               f"{where} failed: {error}")
         return
     print(f"{inline} new inline comment(s) on changed lines.")
+
+
+def _actions_pull_request_event() -> bool:
+    """True inside a GitHub Actions job that a pull request triggered."""
+    return os.environ.get("GITHUB_ACTIONS") == "true" and os.environ.get(
+        "GITHUB_EVENT_NAME"
+    ) in {"pull_request", "pull_request_target"}
+
+
+def _actions_pull_number() -> int | None:
+    """The running job's pull request number: the event payload, else the ref."""
+    event_path = os.environ.get("GITHUB_EVENT_PATH")
+    if event_path:
+        try:
+            return int(json.loads(Path(event_path).read_text())["pull_request"]["number"])
+        except (OSError, ValueError, KeyError, TypeError):
+            pass
+    match = re.fullmatch(r"refs/pull/(\d+)/(?:merge|head)", os.environ.get("GITHUB_REF", ""))
+    return int(match.group(1)) if match else None
+
+
+def _warn_outdated_workflow(rendered: str) -> None:
+    """Say so from inside the pre-September workflow, the one without --pull.
+
+    That workflow runs the CLI on every pull request, prints the report to
+    the job log, and does nothing else: the check is green and the pull
+    request is silent, which reads as "did not run". The CLI is the one part
+    of that workflow that comes from `main`, so it is the one place that can
+    explain the silence: a warning annotation on the run naming the upgrade
+    command, and the report on the run's summary page, which GitHub gives
+    every job whether or not the workflow file mentions it. Nothing here can
+    fail the run; that workflow passed before and still does.
+    """
+    number = _actions_pull_number()
+    where = f"pull request #{number}" if number is not None else "this pull request"
+    print(
+        f"::warning title=PX Review workflow is outdated::PX Review reviewed {where}, but "
+        "this workflow only prints the report to the job log; nothing is posted on the "
+        f"pull request. Update the workflow file: {UPDATE_WORKFLOW_COMMAND}"
+    )
+    summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if not summary_path:
+        return
+    note = (
+        "> **This workflow predates PX Review's pull-request comments.** The report "
+        "below reached only this page and the job log. To have it posted on the pull "
+        f"request, run `{UPDATE_WORKFLOW_COMMAND}` and commit the workflow file.\n\n"
+    )
+    try:
+        with open(summary_path, "a", encoding="utf-8") as summary:
+            summary.write(note + rendered + "\n")
+    except OSError as error:
+        print(f"::warning::PX review: could not write the step summary: {error}")
 
 
 def _outcome_word(outcome) -> str:
