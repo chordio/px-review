@@ -148,7 +148,11 @@ def test_report_reads_like_a_status_page():
     assert "- **[low] Vague error copy**\n" in report          # feature-level: no location
     assert "**Fix:** Use the existing undo toast after deletion." in report
     # One prompt hands every finding to a coding agent.
-    assert "<summary><b>Prompt for a coding agent</b> · fixes all 3 findings</summary>" in report
+    assert "**Prompt for a coding agent** · fixes all 3 findings" in report
+    # A plain fenced block at the top level, not inside <details>: GitHub's copy
+    # button lives on the block, and there is no section to expand first.
+    assert "<details>\n<summary><b>Prompt" not in report
+    assert "\n\n```text\nFix the following PX Review findings" in report
     assert (
         "Fix the following PX Review findings in acme/app (pull request #4, head head12345678)."
         in report
@@ -193,13 +197,19 @@ def test_report_colours_and_check_line_follow_policy_and_conclusion():
     assert "block_on" not in report
 
 
-def test_agent_prompts_cannot_break_out_of_their_fence_or_mention_anyone():
+def test_agent_prompts_cannot_break_out_of_their_fence_and_paste_verbatim():
     finding = _finding(
         title="Ping @team ``` now",
-        body="Body with ``` a fence and a <!-- comment -->.",
+        body="Body with ``` a fence and a <!-- comment --> at @/components/Row.tsx.",
     )
     outcome = _outcome([finding], [_assessment("pathway_completeness", "findings")])
     for text in (render_check_summary(outcome), render_inline_comment(finding)):
         fenced = text.split("```text", 1)[1].split("```", 1)[0]
-        assert "'''" in fenced and "@​team" in fenced
-        assert "@team" not in text and "<!-- comment" not in text
+        outside = text.replace(fenced, "")
+        # Inside the fence nothing can mention or comment, so the prompt keeps
+        # the text an agent will grep for: no zero-width space after `@`.
+        assert "'''" in fenced and "@team" in fenced and "<!-- comment -->" in fenced
+        assert "@/components/Row.tsx" in fenced and "\u200b" not in fenced
+        # Outside it, the same title and body are neutralised as before.
+        assert "@team" not in outside and "<!-- comment" not in outside
+        assert "@\u200bteam" in outside

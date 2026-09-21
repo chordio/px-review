@@ -42,8 +42,14 @@ def _evidence(items: list[str]) -> str:
 
 
 def _plain(text: str) -> str:
-    """Text for inside a fenced block: no fence can close early, no mention fires."""
-    return _safe_markdown(text).replace("```", "'''").strip()
+    """Text for inside a fenced block: only a backtick fence could close it early.
+
+    Mentions and HTML comments are inert inside a code block, and this text is
+    pasted into a coding agent, so it must not carry the zero-width spaces that
+    `_safe_markdown` adds: those turn `@/components/Button.tsx` into a path no
+    agent can find.
+    """
+    return text.replace("```", "'''").strip()
 
 
 def _location(finding: ReviewFinding) -> str:
@@ -187,18 +193,22 @@ def _agent_prompt_section(
     pull_number: int | None,
     head_sha: str | None,
 ) -> list[str]:
+    """The prompt as a plain fenced block, not inside a collapsible.
+
+    GitHub's copy button sits on the block itself. Kept at the top level so
+    the button is always there to hover, with no section to expand first and
+    no heading that reads like a button and does nothing when clicked.
+    """
     count = len(outcome.findings)
     noun = "finding" if count == 1 else "findings"
     return [
-        "<details>",
-        f"<summary><b>Prompt for a coding agent</b> · fixes all {count} {noun}</summary>",
+        f"**Prompt for a coding agent** · fixes all {count} {noun} · copy the block below",
         "",
         "```text",
         agent_prompt(
             outcome, repository=repository, pull_number=pull_number, head_sha=head_sha
         ),
         "```",
-        "</details>",
     ]
 
 
@@ -305,8 +315,8 @@ def render_inline_comment(finding: ReviewFinding) -> str:
         f"{_safe_markdown(finding.body)}\n\n"
         f"**Fix:** {_safe_markdown(finding.recommendation)}"
         f"{evidence}\n\n"
-        "<details>\n<summary>Prompt for a coding agent</summary>\n\n"
-        f"```text\n{prompt}\n```\n</details>\n\n"
+        "**Prompt for a coding agent** · copy the block below\n\n"
+        f"```text\n{prompt}\n```\n\n"
         f"<!-- px-review:{finding_fingerprint(finding)} -->"
     )
 
